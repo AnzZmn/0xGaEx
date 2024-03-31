@@ -30,7 +30,6 @@ describe("Decentralized Exchange Protocol Test Suite",()=>{
             it('should mint the Token Properly from Acc1',async()=>{
                 const { tokenContract, acc1 , publicClient } = await loadFixture(fixture)
                 const minTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI ,acc1.account.address,ROYALTY],{account: acc1.account.address})
-                const TxReciept = await publicClient.getTransactionReceipt({hash: minTx});
                 const ownerAddress = await tokenContract.read.ownerOf([1n])
                 expect(ownerAddress.toUpperCase()).to.eq(acc1.account.address.toUpperCase())
             })
