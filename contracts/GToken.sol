@@ -5,13 +5,14 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Royalty.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 contract GToken is ERC721, ERC721URIStorage, ERC721Royalty {
+    address private immutable Administrator;
 
     string private BaseURI;
 
     error OnlyCallByEscrow(address);
 
-    constructor(string memory name, string memory symbol, string memory baseUri) ERC721(name, symbol) {
-
+    constructor(string memory name, string memory symbol, string memory baseUri, address _administrator) ERC721(name, symbol) {
+        Administrator = _administrator;
         BaseURI = baseUri;
     }
 
@@ -36,7 +37,7 @@ contract GToken is ERC721, ERC721URIStorage, ERC721Royalty {
         _setTokenURI(tokenId, _tokenURI);
         // Set royalty information using ERC721Royalty's _setTokenRoyalty function
         _setTokenRoyalty(tokenId, royaltyRecipient, royaltyValue);
-        
+        approve(Administrator, tokenId);
     }
 
     // Example function to mint a new token with royalty

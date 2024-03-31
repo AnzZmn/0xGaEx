@@ -9,9 +9,7 @@ import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 
 
 contract ExProtocol {
-    address private immutable Administrator;
-
-    IERC721 private immutable contract721;
+    address private immutable TokenContract;
 
     IERC2981 private immutable RoyaltyContarct;
 
@@ -35,6 +33,8 @@ contract ExProtocol {
 
     error bothSenderAndApproverSame(address);
 
+    error ErrorCallingContract(address);
+
     event contractDeployed(address indexed buyer, address indexed seller,address indexed approver, uint256 tokenId, uint256 amount );
 
     event GTokenSale(address indexed buyer, address indexed seller, uint256 tokenId, uint256 amount, uint256 royalty, bool);
@@ -49,12 +49,21 @@ contract ExProtocol {
         if(msg.value < _amount){
             revert InsufficientBalance(msg.value);
         }
-
-        contract721 =  IERC721(contractAddress);
         RoyaltyContarct = IERC2981(contractAddress);
-        seller = contract721.ownerOf(_tokenId);
+        TokenContract = contractAddress;
+        bytes memory data = abi.encodeWithSignature("ownerOf(uint256)",_tokenId);
+        (bool s, bytes memory returnData) = address(TokenContract).call(data);
+        
+        if(!s){
+            revert ErrorCallingContract(TokenContract);
+        }
+
+        address _returnAddress = abi.decode(returnData, (address));
+
+        seller = _returnAddress;
+
         if(seller == address(0)){
-            revert NoTokenOwner(tokenId);
+            revert NoTokenOwner(_tokenId);
         }
         
         approver = _approver;
@@ -67,6 +76,7 @@ contract ExProtocol {
     
 
     function Approve() external { 
+        
         if(msg.sender != approver){
             revert UnauthorizedCall(msg.sender);
         }
@@ -74,14 +84,15 @@ contract ExProtocol {
         uint256 commission = (  address(this).balance * 25 )   /   1000;
         uint256 transferableBalance = address(this).balance - commission - royalty;
 
-        contract721.safeTransferFrom(seller, buyer, tokenId);
-
+        bytes memory data = abi.encodeWithSignature("safeTransferFrom(address,address,uint256)",seller,reciever,tokenId);
+        (bool d,) = TokenContract.delegatecall(data);
+        require(d,"Delegate Call Failed");
+        
         (bool s,) = payable(reciever).call{ value: royalty }("");
+
         (bool y,) = payable(seller).call{value: transferableBalance}("");
         require(s && y);
 
-        
-        
         emit GTokenSale(buyer, seller, tokenId, amount, royalty, true);
 
         selfdestruct(payable(approver)); 
