@@ -8,6 +8,8 @@ contract GToken is ERC721, ERC721URIStorage, ERC721Royalty {
 
     string private BaseURI;
 
+    error OnlyCallByEscrow(address);
+
     constructor(string memory name, string memory symbol, string memory baseUri) ERC721(name, symbol) {
 
         BaseURI = baseUri;
@@ -45,12 +47,20 @@ contract GToken is ERC721, ERC721URIStorage, ERC721Royalty {
 
     // Override the BaseURI
     function _baseURI() internal view virtual override returns(string memory){
-
         return BaseURI;
     } 
 
+
     function baseURI() external view returns(string memory){
         return _baseURI();
+    }
+
+    // function transferFrom(address from, address to, uint256 tokenId) public virtual override(ERC721,IERC721) {
+    //     revert OnlyCallByEscrow(msg.sender);
+    // }
+
+    function _feeDenominator() internal pure virtual override returns (uint96) {
+        return 100;
     }
 }
 

@@ -9,6 +9,7 @@
   "author": "Anas Zaman P A",
   "license": "ISC",
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.6",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
     "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
     "ethers": "^6.11.1",
