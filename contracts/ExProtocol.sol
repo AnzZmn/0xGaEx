@@ -41,19 +41,26 @@ contract ExProtocol {
 
     // @params tokenId: TokenId of the GToken
     // @params _amount: Agreed Upon Exchange Value
-    constructor(uint256 _tokenId, uint256 _amount, address contractAddress, address _approver) payable {
-        
-        if(msg.sender == _approver){
-            revert bothSenderAndApproverSame(msg.sender);
-        }
+    constructor(uint256 _tokenId, uint256 _amount, address contractAddress) payable {
         if(msg.value < _amount){
             revert InsufficientBalance(msg.value);
         }
         RoyaltyContarct = IERC2981(contractAddress);
         TokenContract = contractAddress;
+        bytes memory _approverData = abi.encodeWithSignature("getApproved(uint256)",_tokenId);
+        (bool r, bytes memory _ApproverAddress) = TokenContract.call(_approverData);
+        if(!r){
+            revert ErrorCallingContract(TokenContract);
+        }
+        address _returnedAppover = abi.decode(_ApproverAddress, (address));
+        approver = _returnedAppover;
+        if(msg.sender == approver){
+            revert bothSenderAndApproverSame(msg.sender);
+        }
+
+
         bytes memory data = abi.encodeWithSignature("ownerOf(uint256)",_tokenId);
-        (bool s, bytes memory returnData) = address(TokenContract).call(data);
-        
+        (bool s, bytes memory returnData) = TokenContract.call(data);
         if(!s){
             revert ErrorCallingContract(TokenContract);
         }
@@ -62,11 +69,14 @@ contract ExProtocol {
 
         seller = _returnAddress;
 
+
+
+
         if(seller == address(0)){
             revert NoTokenOwner(_tokenId);
         }
         
-        approver = _approver;
+
         tokenId = _tokenId;
         buyer = msg.sender;
         amount = _amount;

@@ -60,6 +60,13 @@ describe("Decentralized Exchange Protocol Test Suite",()=>{
                 expect(Royalty).to.eq((ROYALTY*SALE_PRICE)/100n)
                     
             })
+
+            it('Should Set the Approver to Administrator Contract on Minting a New Token',async()=>{
+                const { acc1, tokenContract, AdminContract } = await loadFixture(fixture)
+                const mintTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI, acc1.account.address, ROYALTY],{account: acc1.account});
+                const approver = await tokenContract.read.getApproved([TOKEN_ID]);
+                expect(approver.toUpperCase()).to.equal(AdminContract.address.toUpperCase())
+            })
         })
 
         describe('ExProtocol Test Cases',()=>{
@@ -67,7 +74,7 @@ describe("Decentralized Exchange Protocol Test Suite",()=>{
             it('should Deploy Escrow Contract Properly',async()=>{
                 const { acc1, deployer, tokenContract, AdminContract } = await loadFixture(fixture)
                 const minTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI ,acc1.account.address,ROYALTY],{account: acc1.account.address})
-                const EscrowContract = await viem.deployContract("ExProtocol",[TOKEN_ID, SALE_PRICE , tokenContract.address, AdminContract.address],{value: SALE_PRICE})
+                const EscrowContract = await viem.deployContract("ExProtocol",[TOKEN_ID, SALE_PRICE , tokenContract.address],{value: SALE_PRICE})
                 const logs = (await EscrowContract.getEvents.contractDeployed())[0]["args"];
                 const {buyer, seller, approver, tokenId, amount } = logs;
                 expect(buyer?.toUpperCase()).to.be.equal(deployer.account.address.toUpperCase());
@@ -78,11 +85,13 @@ describe("Decentralized Exchange Protocol Test Suite",()=>{
             })
 
             describe('Should Transfer The Asset Properly', () => {
-                it('Should Set the Approver to Administrator Contract on Minting a New Token',async()=>{
+
+                it('Should initiate Transfer When Calling Approve from Administrator',async()=>{
                     const { acc1, tokenContract, AdminContract } = await loadFixture(fixture)
                     const mintTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI, acc1.account.address, ROYALTY],{account: acc1.account});
+                    const EscrowContract = await viem.deployContract("ExProtocol",[TOKEN_ID, SALE_PRICE , tokenContract.address],{value: SALE_PRICE})
                     const approver = await tokenContract.read.getApproved([TOKEN_ID]);
-                    expect(approver.toUpperCase()).to.equal(AdminContract.address.toUpperCase())
+                    console.log(approver, AdminContract.address)
                 })
             })
 
