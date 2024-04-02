@@ -14,11 +14,10 @@ const SALE_PRICE = 1000000000000000000n
 
 async function fixture() {
         const publicClient = await viem.getPublicClient();
-        const [deployer, acc1, acc2, ApproveAcc] = await viem.getWalletClients();
+        const [deployer, acc1, acc2, approveAcc] = await viem.getWalletClients();
         const AdminContract = await viem.deployContract("Administrator");
         const tokenContract = await viem.deployContract("GToken",[NAME,SYMBOL,BASE_URL,AdminContract.address]);
-        
-        return {tokenContract, AdminContract, deployer, acc1, acc2, publicClient, ApproveAcc};
+        return {tokenContract, AdminContract, deployer, acc1, acc2, publicClient, approveAcc};
 }
 
 
@@ -27,45 +26,38 @@ describe("Decentralized Exchange Protocol Test Suite",()=>{
         
         describe('GToken Test Cases',()=>{
 
-            it('should mint the Token Properly from Acc1',async()=>{
-                const { tokenContract, acc1 , publicClient } = await loadFixture(fixture)
-                const minTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI ,acc1.account.address,ROYALTY],{account: acc1.account.address})
-                const ownerAddress = await tokenContract.read.ownerOf([1n])
-                expect(ownerAddress.toUpperCase()).to.eq(acc1.account.address.toUpperCase())
+            it(`Should deploy with Name: ${NAME} , Symbol: ${SYMBOL} and BaseURL: ${BASE_URL} `, async ()=>{
+                const { tokenContract } = await loadFixture(fixture);
+                expect(await tokenContract.read.baseURI()).to.eq(BASE_URL);
+                expect(await tokenContract.read.name()).to.eq(NAME);
+                expect(await tokenContract.read.symbol()).to.eq(SYMBOL);
             })
 
-            it(`Should deploy with Name: ${NAME} , Symbol: ${SYMBOL} and BaseURL: ${BASE_URL} `, async ()=>{
-                const { tokenContract   } = await loadFixture(fixture)
-                const name = await tokenContract.read.name()
-                const symbol = await tokenContract.read.symbol();
-                const baseUri = await tokenContract.read.baseURI();
-                expect(name).to.be.eq(NAME);
-                expect(symbol).to.eq(SYMBOL);
-                expect(baseUri).to.eq(BASE_URL);
+            it('should mint the Token Properly from Acc1',async()=>{
+                const { tokenContract, acc1 , publicClient } = await loadFixture(fixture)
+                const mintTx = await tokenContract.write.mint([TOKEN_ID,URI, ROYALTY],{account: acc1.account})
+                expect((await tokenContract.read.ownerOf([TOKEN_ID])).toUpperCase()).to.eq(acc1.account.address.toUpperCase())
+                expect(await tokenContract.read.balanceOf([acc1.account.address])).to.eq(1);
             })
     
             it('Should Set The TokenURI upon minting new Token', async()=>{
                 const { tokenContract, acc1, publicClient   } = await loadFixture(fixture)
-                const minTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI ,acc1.account.address,ROYALTY],{account: acc1.account.address})
-                const tokenURI = await tokenContract.read.tokenURI([TOKEN_ID])
-                expect(tokenURI).to.eq(`MY_CUSTOM_URI${URI}`)
+                const mintTx = await tokenContract.write.mint([TOKEN_ID,URI, ROYALTY],{account: acc1.account})
+                expect(await tokenContract.read.tokenURI([TOKEN_ID])).to.eq(BASE_URL+URI)
             })
     
             it(`Should set the Royalty to ${ROYALTY}%`,async()=>{
                 const { tokenContract, acc1 } = await loadFixture(fixture)
-                const minTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI ,acc1.account.address,ROYALTY],{account: acc1.account.address})
-                const [Recipeint, Royalty] = await tokenContract.read.royaltyInfo([TOKEN_ID,SALE_PRICE])
-                //console.log(`Royalty : ${formatEther(Royalty)}, recipient: ${Recipeint}, salePrice: ${formatEther(SALE_PRICE)}`);
-                expect(Recipeint.toUpperCase()).to.eq(acc1.account.address.toUpperCase())
-                expect(Royalty).to.eq((ROYALTY*SALE_PRICE)/100n)
-                    
+                const mintTx = await tokenContract.write.mint([TOKEN_ID,URI, ROYALTY],{account: acc1.account})
+                const [ reciever, amount ] = await tokenContract.read.royaltyInfo([TOKEN_ID,SALE_PRICE])  
+                expect(amount).to.eq((ROYALTY*SALE_PRICE)/100n)
+                expect(reciever.toUpperCase()).to.eq(acc1.account.address.toUpperCase())
             })
 
-            it('Should Set the Approver to Administrator Contract on Minting a New Token',async()=>{
+            it('Should Set the Operator to Administrator Contract on Minting a New Token',async()=>{
                 const { acc1, tokenContract, AdminContract } = await loadFixture(fixture)
-                const mintTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI, acc1.account.address, ROYALTY],{account: acc1.account});
-                const approver = await tokenContract.read.getApproved([TOKEN_ID]);
-                expect(approver.toUpperCase()).to.equal(AdminContract.address.toUpperCase())
+                const mintTx = await tokenContract.write.mint([TOKEN_ID,URI, ROYALTY],{account: acc1.account})
+                expect(await tokenContract.read.isApprovedForAll([acc1.account.address, AdminContract.address])).to.be.true
             })
         })
 
@@ -73,25 +65,15 @@ describe("Decentralized Exchange Protocol Test Suite",()=>{
 
             it('should Deploy Escrow Contract Properly',async()=>{
                 const { acc1, deployer, tokenContract, AdminContract } = await loadFixture(fixture)
-                const minTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI ,acc1.account.address,ROYALTY],{account: acc1.account.address})
-                const EscrowContract = await viem.deployContract("ExProtocol",[TOKEN_ID, SALE_PRICE , tokenContract.address],{value: SALE_PRICE})
-                const logs = (await EscrowContract.getEvents.contractDeployed())[0]["args"];
-                const {buyer, seller, approver, tokenId, amount } = logs;
-                expect(buyer?.toUpperCase()).to.be.equal(deployer.account.address.toUpperCase());
-                expect(seller?.toUpperCase()).to.be.equal(acc1.account.address.toUpperCase());
-                expect(approver?.toUpperCase()).to.be.equal(AdminContract.address.toUpperCase());
-                expect(tokenId).to.be.equal(TOKEN_ID);
-                expect(amount).to.be.equal(SALE_PRICE);
+                throw new Error("Intentional test error");
+
             })
 
             describe('Should Transfer The Asset Properly', () => {
 
                 it('Should initiate Transfer When Calling Approve from Administrator',async()=>{
                     const { acc1, tokenContract, AdminContract } = await loadFixture(fixture)
-                    const mintTx = await tokenContract.write.mint([acc1.account.address, TOKEN_ID, URI, acc1.account.address, ROYALTY],{account: acc1.account});
-                    const EscrowContract = await viem.deployContract("ExProtocol",[TOKEN_ID, SALE_PRICE , tokenContract.address],{value: SALE_PRICE})
-                    const approver = await tokenContract.read.getApproved([TOKEN_ID]);
-                    console.log(approver, AdminContract.address)
+                    throw new Error("Intentional test error");
                 })
             })
 

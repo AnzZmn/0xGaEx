@@ -9,8 +9,9 @@ import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 
 
 contract ExProtocol {
+      
     address private immutable TokenContract;
-
+    
     IERC2981 private immutable RoyaltyContarct;
 
     address private immutable approver;

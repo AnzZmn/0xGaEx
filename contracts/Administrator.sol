@@ -11,7 +11,4 @@ contract Administrator {
     constructor() {
         
     }
-    function testCall(address contractAddress) external {
-        IExProtocol(contractAddress).Approve();
-    }
 }
