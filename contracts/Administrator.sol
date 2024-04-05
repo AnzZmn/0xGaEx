@@ -2,13 +2,11 @@
 
 pragma solidity ^0.8.24;
 
-interface IExProtocol {
-    function Approve() external;
-    function disapprove() external;
-}
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Administrator {
-    constructor() {
-        
+
+contract Administrator is Ownable{
+
+    constructor() Ownable(_msgSender()){
     }
 }

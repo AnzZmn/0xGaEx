@@ -2,129 +2,112 @@
 
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 
-
-
-contract ExProtocol {
-      
-    address private immutable TokenContract;
+contract ExProtocol is Context{
     
-    IERC2981 private immutable RoyaltyContarct;
 
-    address private immutable approver;
+    address private immutable tokenContractAddress;
 
-    address private buyer;
+    address private immutable adminContarct;
 
-    address private seller;
+    uint256 public immutable tokenId;
 
-    uint256 private amount;
+    string private associatedEmail;
 
-    uint256 private tokenId;
+    address public currentOwner;
 
-    uint256 private royaltyAmount;
+    string private pass;
 
-    error InsufficientBalance(uint256);
+    bool isListed;
 
-    error NoTokenOwner(uint256);
+    struct Trade {
 
-    error UnauthorizedCall(address);
+        address buyer;
 
-    error bothSenderAndApproverSame(address);
+        address  seller;
 
-    error ErrorCallingContract(address);
+        uint256  amount;
 
-    event contractDeployed(address indexed buyer, address indexed seller,address indexed approver, uint256 tokenId, uint256 amount );
+        uint256  royaltyAmount;
 
-    event GTokenSale(address indexed buyer, address indexed seller, uint256 tokenId, uint256 amount, uint256 royalty, bool);
+        address royaltyReciever;
+
+        bool isExecuted;
+
+    }
+
+    Trade private trade;
 
     // @params tokenId: TokenId of the GToken
-    // @params _amount: Agreed Upon Exchange Value
-    constructor(uint256 _tokenId, uint256 _amount, address contractAddress) payable {
-        if(msg.value < _amount){
-            revert InsufficientBalance(msg.value);
-        }
-        RoyaltyContarct = IERC2981(contractAddress);
-        TokenContract = contractAddress;
-        bytes memory _approverData = abi.encodeWithSignature("getApproved(uint256)",_tokenId);
-        (bool r, bytes memory _ApproverAddress) = TokenContract.call(_approverData);
-        if(!r){
-            revert ErrorCallingContract(TokenContract);
-        }
-        address _returnedAppover = abi.decode(_ApproverAddress, (address));
-        approver = _returnedAppover;
-        if(msg.sender == approver){
-            revert bothSenderAndApproverSame(msg.sender);
-        }
-
-
-        bytes memory data = abi.encodeWithSignature("ownerOf(uint256)",_tokenId);
-        (bool s, bytes memory returnData) = TokenContract.call(data);
-        if(!s){
-            revert ErrorCallingContract(TokenContract);
-        }
-
-        address _returnAddress = abi.decode(returnData, (address));
-
-        seller = _returnAddress;
-
-
-
-
-        if(seller == address(0)){
-            revert NoTokenOwner(_tokenId);
-        }
-        
-
+    constructor(uint256 _tokenId, address contractAddress, address _adminContarct,string memory _emailAddress){
+        adminContarct = _adminContarct;
+        currentOwner = _msgSender();
+        tokenContractAddress = contractAddress;
         tokenId = _tokenId;
-        buyer = msg.sender;
-        amount = _amount;
-
-        emit contractDeployed(buyer, seller, approver, tokenId,  amount);
+        associatedEmail = _emailAddress;
+        isListed = false;
     }
-    
 
-    function Approve() external { 
-        
-        if(msg.sender != approver){
-            revert UnauthorizedCall(msg.sender);
+    function listToken() public {
+        if(_msgSender() != currentOwner){
+            revert();
         }
-        (address reciever,uint256 royalty) = RoyaltyContarct.royaltyInfo(tokenId, amount);
-        uint256 commission = (  address(this).balance * 25 )   /   1000;
-        uint256 transferableBalance = address(this).balance - commission - royalty;
-
-        bytes memory data = abi.encodeWithSignature("safeTransferFrom(address,address,uint256)",seller,reciever,tokenId);
-        (bool d,) = TokenContract.delegatecall(data);
-        require(d,"Delegate Call Failed");
-        
-        (bool s,) = payable(reciever).call{ value: royalty }("");
-
-        (bool y,) = payable(seller).call{value: transferableBalance}("");
-        require(s && y);
-
-        emit GTokenSale(buyer, seller, tokenId, amount, royalty, true);
-
-        selfdestruct(payable(approver)); 
-
+        isListed = true;
     }
-    
-    function disapprove() external {
-        if(msg.sender != approver){
-            revert UnauthorizedCall(msg.sender);
+
+    function initializeTrade(uint256 _amount) external payable{
+        if(!isListed){
+            revert();
         }
-        emit GTokenSale(buyer, seller, tokenId, amount, uint256(0) , false);
-        selfdestruct(payable(buyer));
+        if(msg.value < _amount){
+            revert();
+        }
+
+        (address reciever, uint256 royalty) = _getInfo(_amount);
+        trade.amount = _amount;
+        trade.buyer = _msgSender();
+        trade.seller = currentOwner;
+        trade.royaltyAmount = royalty;
+        trade.royaltyReciever = reciever;
+        trade.isExecuted = false;
     }
 
+    function _getInfo(uint256 _amount) internal returns(address,uint256){
+        bytes memory data = abi.encodeWithSignature("royaltyInfo(uint256,uint256)",tokenId,_amount);
+        (bool s, bytes memory returnData) = tokenContractAddress.call(data);
+        if(!s){
+            revert();
+        }
+        (address reciever, uint256 royalty) = abi.decode(returnData, (address,uint256));
+        return (reciever,royalty);
+    }
 
+    function _executeTrade() internal {
+        bytes memory data = abi.encodeWithSignature("transferFrom(address,address,uint256)",trade.seller,trade.buyer,trade.amount);
+        (bool s,) = tokenContractAddress.call(data);
+        if(!s){
+            revert();
+        }
+        (bool se,) = payable(trade.seller).call{value: trade.amount }("");
+        (bool  ro,) = payable(trade.royaltyReciever).call{value: trade.royaltyAmount }("");
+        (bool ad,) = payable(adminContarct).call{value: address(this).balance}("");
+        if(!se || !ro || !ad){
+            revert();
+        }
+        
+    }
 
+    function _getPass() internal view returns(string memory){
+        if(_msgSender()!= currentOwner){
+            revert();
+        }
+        return pass;
+    }
 
-
-
-
-
+    function _setPass(string calldata _pass) internal{
+        pass = _pass;
+    }
 
 
 }

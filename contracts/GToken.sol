@@ -10,8 +10,6 @@ contract GToken is ERC721URIStorage, ERC721Royalty {
 
     string private BaseURI;
 
-    error OnlyCallByEscrow(address);
-
     mapping(address owner => uint256) private _balances;
 
     constructor(string memory name, string memory symbol, string memory baseUri, address _administrator) ERC721(name, symbol) {
